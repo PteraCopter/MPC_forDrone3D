@@ -27,7 +27,7 @@ public class MakeTargetPoint : MonoBehaviour
             for(int i=0;i<mPControl.Obstacle.Length;i++){
                 if(Vector2.Distance(TargetPoint,new Vector2(mPControl.Obstacle[i].transform.position.x,
                                                             mPControl.Obstacle[i].transform.position.z))
-                    <mPControl.ObstacleRadius+2) isCloseToObstacle=true;
+                    <mPControl.ObstacleRadius+1.5f) isCloseToObstacle=true;
             }
             Vector2 CurPosition=new Vector2(BodyTransform.position.x,BodyTransform.position.z);
             if(Vector2.Distance(CurPosition,TargetPoint)<0.2f||isCloseToObstacle){
