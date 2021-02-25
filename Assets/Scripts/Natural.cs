@@ -61,8 +61,6 @@ public class Natural : MonoBehaviour
             PositionIndicaterPosition[i]=new Vector3(mPControl.BodyPos_x[i],0.1f,mPControl.BodyPos_z[i]);
             lineRenderer.SetPosition(i,PositionIndicaterPosition[i]);
         }
-
-        Debug.Log("acutualinput"+mPControl.BodyVel_x[0]);
         BodyTransform.position=new Vector3(mPControl.BodyPos_x[0],0,mPControl.BodyPos_z[0]);
     }
 }

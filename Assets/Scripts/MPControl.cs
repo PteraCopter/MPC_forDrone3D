@@ -35,11 +35,13 @@ public class MPControl : MonoBehaviour{
     public bool MPC_mode=true;
     public Natural natural;
     public MakeTargetPoint makeTargetPoint;
+    public GameObject[] Obstacle;
     public int GMRES_RepeatTime=2;
     public int PredictionTime=10;
     public float StableConstant=0.1f;
     public float XConstant=1,ZConstant=1,VxCosntant=1,  VzConstant=1,XConstant_Stage=1,ZConstant_Stage=1,VxConstant_Stage=1,VzConstant_Stage=1,
-                    AxConstant_Stage=1,AzConstant_Stage=1,JxConstant_Stage=1,JzConstant_Stage=1,SxConstant_Stage=1,SzConstant_Stage=1;
+                    AxConstant_Stage=1,AzConstant_Stage=1,JxConstant_Stage=1,JzConstant_Stage=1,SxConstant_Stage=1,SzConstant_Stage=1,
+                    ObstacleRadius=0.3f,ObstacleEffectScope=0.5f,ObstacleCostConstant=10;
     public float FinalEvaluarionScope=0.5f;//[s]
     public float[] BodyPos_x,BodyPos_z;
     public float[] BodyVel_x,BodyVel_z;
@@ -54,10 +56,13 @@ public class MPControl : MonoBehaviour{
     float PosRef_x,PosRef_z;
     float InitialTime;
     Transform BodyTransform;
+    float[,] ObstaclePos_x,ObstaclePos_z;//[Number of Obstacle,predictiontime]
     bool isCloseToTarget=false;
 
     // Start is called before the first frame update
     void Start(){
+        ObstaclePos_x=new float[Obstacle.Length,PredictionTime+1];
+        ObstaclePos_z=new float[Obstacle.Length,PredictionTime+1];
         BodyPos_x=new float[PredictionTime+1];
         BodyPos_z=new float[PredictionTime+1];
         BodyVel_x=new float[PredictionTime+1];
@@ -156,6 +161,10 @@ public class MPControl : MonoBehaviour{
             PreBodyVel_z=BodyVel_z[0];
             PreBodyAcc_x=BodyAcc_x[0];
             PreBodyAcc_z=BodyAcc_z[0];
+            for(int i=0;i<Obstacle.Length;i++){
+                ObstaclePos_x[i,0]=Obstacle[i].transform.position.x;
+                ObstaclePos_z[i,0]=Obstacle[i].transform.position.z;
+            }
 
             //difine EvaluationTime in this loop
             //EvalutionTime will converge to FinalEvaluationScope/PredictionTime
@@ -174,6 +183,10 @@ public class MPControl : MonoBehaviour{
                 BodyAcc_z[i]=BodyAcc_z[i-1]+BodyJerk_z[i-1]*EvalDT;//+BodySnap_z[i-1]*EvalDT*EvalDT/2;
                 BodyJerk_x[i]=BodyJerk_x[i-1]+BodySnap_x[i-1]*EvalDT;
                 BodyJerk_z[i]=BodyJerk_z[i-1]+BodySnap_z[i-1]*EvalDT;
+                for(int j=0;j<Obstacle.Length;j++){
+                    ObstaclePos_x[j,i]=Obstacle[j].transform.position.x;
+                    ObstaclePos_z[j,i]=Obstacle[j].transform.position.z;
+                }
             }
 
 
@@ -193,8 +206,28 @@ public class MPControl : MonoBehaviour{
             //following AdVec[last], AdVec[last -1] can be calculated by AdVec[last -1]=AdVec[last]+ ðH/ðx*dτ, and so on.
             //逆順に随伴変数を求めていく。AdVec[i-1]=AdVec[i]+ ðH/ðx*dτのように求められる。
             for(int i=PredictionTime-1;i>0;i--){
-                float AdXContent=XConstant_Stage*(BodyPos_x[i]-PosRef_x);
-                float AdZContent=ZConstant_Stage*(BodyPos_z[i]-PosRef_z);
+                float[] ObstacleDistance=new float[ObstaclePos_x.Length];
+                float ObstacleCost_x=0,ObstacleCost_z=0;
+                for(int j=0;j<Obstacle.Length;j++){
+                    ObstacleDistance[j]=new Vector2(ObstaclePos_x[j,i]-BodyPos_x[i],ObstaclePos_z[j,i]-BodyPos_z[i]).magnitude;
+                    if(ObstacleDistance[j]<ObstacleRadius&&i<5)Debug.Log(i+":"+j+":"+ObstacleDistance[j]);
+                    if(ObstacleDistance[j]>ObstacleRadius+ObstacleEffectScope){
+                        ObstacleCost_x+=0;
+                        ObstacleCost_z+=0;
+                    }else if(ObstacleDistance[j]>ObstacleRadius){
+                        ObstacleCost_x+=-ObstacleCostConstant/ObstacleEffectScope*(ObstaclePos_x[j,i]-BodyPos_x[i])/ObstacleDistance[j]
+                                            *(ObstacleDistance[j]-ObstacleRadius-ObstacleEffectScope)
+                                            /Mathf.Sqrt(Mathf.Pow(ObstacleEffectScope,2)-Mathf.Pow(ObstacleDistance[j]-ObstacleRadius-ObstacleEffectScope,2));
+                        ObstacleCost_z+=-ObstacleCostConstant/ObstacleEffectScope*(ObstaclePos_z[j,i]-BodyPos_z[i])/ObstacleDistance[j]
+                                            *(ObstacleDistance[j]-ObstacleRadius-ObstacleEffectScope)
+                                            /Mathf.Sqrt(Mathf.Pow(ObstacleEffectScope,2)-Mathf.Pow(ObstacleDistance[j]-ObstacleRadius-ObstacleEffectScope,2));
+                    }else {
+                        ObstacleCost_x+=50*ObstacleCostConstant/ObstacleRadius*(ObstaclePos_x[j,i]-BodyPos_x[i])/Mathf.Sqrt(ObstacleRadius*ObstacleRadius-ObstacleDistance[j]*ObstacleDistance[j]);
+                        ObstacleCost_z+=50*ObstacleCostConstant/ObstacleRadius*(ObstaclePos_z[j,i]-BodyPos_z[i])/Mathf.Sqrt(ObstacleRadius*ObstacleRadius-ObstacleDistance[j]*ObstacleDistance[j]);
+                    }
+                }
+                float AdXContent=XConstant_Stage*(BodyPos_x[i]-PosRef_x)+ObstacleCost_x;
+                float AdZContent=ZConstant_Stage*(BodyPos_z[i]-PosRef_z)+ObstacleCost_z;
                 float AdVxContent=VxConstant_Stage*BodyVel_x[i]+AdVec_x[i+1];
                 float AdVzContent=VzConstant_Stage*BodyVel_z[i]+AdVec_z[i+1];
                 float AdAxContent=AxConstant_Stage*BodyAcc_x[i]+AdVec_vx[i+1];
@@ -324,7 +357,6 @@ public class MPControl : MonoBehaviour{
             BodyVel_z[0]+=BodyAcc_z[0]*dt;//+BodyJerk_z[0]*dt*dt/2+BodySnap_z[0]*dt*dt*dt/6;
             BodyPos_x[0]+=BodyVel_x[0]*dt;//+BodyAcc_x[0]*dt*dt/2+BodyJerk_x[0]*dt*dt*dt/6+BodySnap_x[0]*dt*dt*dt*dt/24;
             BodyPos_z[0]+=BodyVel_z[0]*dt;//+BodyAcc_z[0]*dt*dt/2+BodyJerk_z[0]*dt*dt*dt/6+BodySnap_z[0]*dt*dt*dt*dt/24;
-            Debug.Log(BodyVel_x[0]+":"+BodyVel_z[0]);
 
                 
             float TargetDiff=Mathf.Pow(PosRef_x-BodyPos_x[0],2)+Mathf.Pow(PosRef_z-BodyPos_z[0],2)
