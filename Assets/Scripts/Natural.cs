@@ -7,6 +7,11 @@ public class Natural : MonoBehaviour
     public Transform BodyTransform;
     public MPControl mPControl;
     public GameObject PredictivePositionIndicaterSample;
+    public Rigidbody RBody;
+    public Transform Pre1;
+    public Transform Pre2;
+    public Transform Pre3;
+    public Transform Pre4;
     GameObject[] PredictivePositionIndicater;
     GameObject[] TrajectoryIndicater;
     Transform[] PredictivePositionIndicaterTransform;
@@ -16,6 +21,8 @@ public class Natural : MonoBehaviour
     LineRenderer lineRendererForTra;
     int NumOfTrajectoryPoint;
     bool haventMade=true;
+    float M=0.3f;
+    float G=9.81f;
 
     void Start(){
         PredictionTime=mPControl.PredictionTime;
@@ -61,8 +68,11 @@ public class Natural : MonoBehaviour
             PositionIndicaterPosition[i]=new Vector3(mPControl.BodyPos_x[i],0.1f,mPControl.BodyPos_z[i]);
             lineRenderer.SetPosition(i,PositionIndicaterPosition[i]);
         }
-
-        Debug.Log("acutualinput"+mPControl.BodyVel_x[0]);
+        Pre1.localEulerAngles+=new Vector3(0,100,0);
+        Pre2.localEulerAngles+=new Vector3(0,100,0);
+        Pre3.localEulerAngles+=new Vector3(0,-100,0);
+        Pre4.localEulerAngles+=new Vector3(0,-100,0);
         BodyTransform.position=new Vector3(mPControl.BodyPos_x[0],0,mPControl.BodyPos_z[0]);
+        BodyTransform.eulerAngles=new Vector3(Mathf.Atan2(mPControl.BodyAcc_z[0],M*G)*Mathf.Rad2Deg,0,-Mathf.Atan2(mPControl.BodyAcc_x[0],M*G)*Mathf.Rad2Deg);
     }
 }
