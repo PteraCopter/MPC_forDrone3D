@@ -16,18 +16,26 @@ using UnityEngine;
     u[t]:時刻tにおける入力
 
     パラメータ記録
-    -2021/19/Jan(非ホロノミック的性質よりxは収束しないがyとthetaは上手いこと言った、入力も振動せず)
-    PosRef_x 0
-    PosRef_y 3
-    GMRES_RepeatTime 2
-    PredictionTime 10
-    SstaleConstant 100
-    YConstant 3
-    YCOnstant_Stage 1
-    ThetaConstant 3
-    ThetaConstant_Stage 1
-    LForceConsant_Stage 0.5
-    RForceConsant_Stage 0.5
+    -2021/26/Feb(great behavior!!)
+    GMRES_RepeatTime 10
+    PredictionTime 50
+    SstaleConstant 0.04
+    XConstant 0.1
+    ZConstant 0.1
+    VxConstant 5
+    VzConstant 5
+    XConstant_Stage 1
+    ZConstant_Stage 1
+    AxConstant 0.1
+    AzConstant 0.1
+    JxConstant 3
+    JzConstant 3
+    SxConstant 0.01
+    SzConstant 0.01
+    ObstacleRadius 2
+    ObstacleEffectScope 2
+    ObstacleCostConstant 1
+    FinaEvalationTime 2
     その他 0
 */
 
@@ -53,16 +61,22 @@ public class MPControl : MonoBehaviour{
     float[] DiffBodySnap_x,DiffBodySnap_z;    
     float[] AdVec_x,AdVec_vx,AdVec_z,AdVec_vz,AdVec_ax,AdVec_az,AdVec_jx,AdVec_jz;//随伴変数
     float PreBodyPos_x,PreBodyVel_x,PreBodyAcc_x,PreBodyPos_z,PreBodyVel_z,PreBodyAcc_z;//previous
+    float[] PreObstaclePos_x, PreObstaclePos_z;
     float PosRef_x,PosRef_z;
     float InitialTime;
     Transform BodyTransform;
     float[,] ObstaclePos_x,ObstaclePos_z;//[Number of Obstacle,predictiontime]
+    float[] ObstacleVel_x,ObstacleVel_z;
     bool isCloseToTarget=false;
 
     // Start is called before the first frame update
     void Start(){
         ObstaclePos_x=new float[Obstacle.Length,PredictionTime+1];
         ObstaclePos_z=new float[Obstacle.Length,PredictionTime+1];
+        ObstacleVel_x=new float[Obstacle.Length];
+        ObstacleVel_z=new float[Obstacle.Length];
+        PreObstaclePos_x=new float[Obstacle.Length];
+        PreObstaclePos_z=new float[Obstacle.Length];
         BodyPos_x=new float[PredictionTime+1];
         BodyPos_z=new float[PredictionTime+1];
         BodyVel_x=new float[PredictionTime+1];
@@ -127,6 +141,12 @@ public class MPControl : MonoBehaviour{
         PreBodyVel_z=0;
         PreBodyAcc_x=0;
         PreBodyAcc_z=0;
+        for(int i=0;i<Obstacle.Length;i++){
+            ObstaclePos_x[i,0]=Obstacle[i].transform.position.x; 
+            ObstaclePos_z[i,0]=Obstacle[i].transform.position.z; 
+            PreObstaclePos_x[i]=ObstaclePos_x[i,0];
+            PreObstaclePos_z[i]=ObstaclePos_z[i,0];
+        }
         InitialTime=Time.time;
     }
 
@@ -164,6 +184,10 @@ public class MPControl : MonoBehaviour{
             for(int i=0;i<Obstacle.Length;i++){
                 ObstaclePos_x[i,0]=Obstacle[i].transform.position.x;
                 ObstaclePos_z[i,0]=Obstacle[i].transform.position.z;
+                ObstacleVel_x[i]=(ObstaclePos_x[i,0]-PreObstaclePos_x[i])/dt;
+                ObstacleVel_z[i]=(ObstaclePos_z[i,0]-PreObstaclePos_z[i])/dt;
+                PreObstaclePos_x[i]=ObstaclePos_x[i,0];
+                PreObstaclePos_z[i]=ObstaclePos_z[i,0];
             }
 
             //difine EvaluationTime in this loop
@@ -184,8 +208,8 @@ public class MPControl : MonoBehaviour{
                 BodyJerk_x[i]=BodyJerk_x[i-1]+BodySnap_x[i-1]*EvalDT;
                 BodyJerk_z[i]=BodyJerk_z[i-1]+BodySnap_z[i-1]*EvalDT;
                 for(int j=0;j<Obstacle.Length;j++){
-                    ObstaclePos_x[j,i]=Obstacle[j].transform.position.x;
-                    ObstaclePos_z[j,i]=Obstacle[j].transform.position.z;
+                    ObstaclePos_x[j,i]=ObstaclePos_x[j,i-1]+ObstacleVel_x[j]*EvalDT;
+                    ObstaclePos_z[j,i]=ObstaclePos_z[j,i-1]+ObstacleVel_z[j]*EvalDT;
                 }
             }
 
