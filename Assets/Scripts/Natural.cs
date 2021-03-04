@@ -4,18 +4,22 @@ using UnityEngine;
 
 public class Natural : MonoBehaviour
 {   
+    public int ControlMode;
     public Transform BodyTransform;
     public MPControl mPControl;
+    public MPControl2 mPControl2;
     public GameObject PredictivePositionIndicaterSample;
+    public GameObject PredictiveObsPosIndicatorSam;
     public Rigidbody RBody;
-    public Transform Pre1;
-    public Transform Pre2;
-    public Transform Pre3;
-    public Transform Pre4;
+    public Transform Prop1;
+    public Transform Prop2;
+    public Transform Prop3;
+    public Transform Prop4;
     GameObject[] PredictivePositionIndicater;
     GameObject[] TrajectoryIndicater;
     Transform[] PredictivePositionIndicaterTransform;
     Vector3[] PositionIndicaterPosition;
+    Transform[,] PredictiveObsPosIndicatorTransform;
     int PredictionTime;
     LineRenderer lineRenderer;
     LineRenderer lineRendererForTra;
@@ -25,14 +29,20 @@ public class Natural : MonoBehaviour
     float G=9.81f;
 
     void Start(){
-        PredictionTime=mPControl.PredictionTime;
+        if(ControlMode==1)PredictionTime=mPControl.PredictionTime;
+        else if(ControlMode==2)PredictionTime=mPControl2.PredictionTime;
         PositionIndicaterPosition=new Vector3[PredictionTime];
         PredictivePositionIndicater=new GameObject[PredictionTime+1];
         PredictivePositionIndicaterTransform=new Transform[PredictionTime+1]; 
+        if(ControlMode==2)
+            PredictiveObsPosIndicatorTransform=
+                    new Transform[mPControl2.ObstacleMaxNum,PredictionTime+1]; 
 
         for(int i=0;i<PredictionTime+1;i++){
-            PredictivePositionIndicater[i]=Instantiate(PredictivePositionIndicaterSample); 
-            PredictivePositionIndicaterTransform[i]=PredictivePositionIndicater[i].GetComponent<Transform>();
+            PredictivePositionIndicaterTransform[i]=Instantiate(PredictivePositionIndicaterSample).GetComponent<Transform>();
+            if(ControlMode==2){
+                for(int j=0;j<mPControl2.ObstacleMaxNum;j++)PredictiveObsPosIndicatorTransform[j,i]=Instantiate(PredictiveObsPosIndicatorSam).GetComponent<Transform>();
+            }
         }
         lineRenderer=gameObject.AddComponent<LineRenderer>();
         lineRenderer.positionCount=PredictionTime;
@@ -41,38 +51,41 @@ public class Natural : MonoBehaviour
 
     void FixedUpdate() 
     {
-        /*if(mPControl.isCloseToTarget && haventMade){
-            Destroy(lineRenderer);
-            NumOfTrajectoryPoint=mPControl.BodyPosXForTrajectory.Count;
-            TrajectoryIndicater=new GameObject[NumOfTrajectoryPoint];
-            lineRendererForTra=gameObject.AddComponent<LineRenderer>();
-            lineRendererForTra.positionCount=NumOfTrajectoryPoint;
-            lineRendererForTra.widthMultiplier=0.05f;
-            float[]  BodyPosXForTra=mPControl.BodyPosXForTrajectory.ToArray();
-            float[]  BodyPosZForTra=mPControl.BodyPosZForTrajectory.ToArray();
-            float[]  BodyVelXForTra=mPControl.BodyVelXForTrajectory.ToArray();
-            float[]  BodyVelZForTra=mPControl.BodyVelZForTrajectory.ToArray();
-            for(int i=0;i<NumOfTrajectoryPoint;i++){
-                TrajectoryIndicater[i]=Instantiate(PredictivePositionIndicaterSample); 
-                TrajectoryIndicater[i].transform.position=new Vector3(BodyPosXForTra[i],0.1f,BodyPosZForTra[i]);
-                lineRendererForTra.SetPosition(i,TrajectoryIndicater[i].transform.position);
-            }
-            BodyTransform.position=new Vector3(BodyPosXForTra[0],0.5f,BodyPosZForTra[0]);
-            haventMade=false;
-        }else if(haventMade){*/
         float dt=Time.deltaTime;
-        lineRenderer.SetPosition(0,new Vector3(mPControl.BodyPos_x[0],0.1f,mPControl.BodyPos_z[0]));
+        if(ControlMode==1){
+            lineRenderer.SetPosition(0,new Vector3(mPControl.BodyPos_x[0],0.1f,mPControl.BodyPos_z[0]));
 
-        for(int i=1;i<PredictionTime;i++){
-            PredictivePositionIndicaterTransform[i].position=new Vector3(mPControl.BodyPos_x[i],0.1f,mPControl.BodyPos_z[i]);
-            PositionIndicaterPosition[i]=new Vector3(mPControl.BodyPos_x[i],0.1f,mPControl.BodyPos_z[i]);
-            lineRenderer.SetPosition(i,PositionIndicaterPosition[i]);
+            for(int i=1;i<PredictionTime;i++){
+                PredictivePositionIndicaterTransform[i].position=new Vector3(mPControl.BodyPos_x[i],0.1f,mPControl.BodyPos_z[i]);
+                PositionIndicaterPosition[i]=new Vector3(mPControl.BodyPos_x[i],0.1f,mPControl.BodyPos_z[i]);
+                lineRenderer.SetPosition(i,PositionIndicaterPosition[i]);
+            }
+            Prop1.localEulerAngles+=new Vector3(0,100,0);
+            Prop2.localEulerAngles+=new Vector3(0,100,0);
+            Prop3.localEulerAngles+=new Vector3(0,-100,0);
+            Prop4.localEulerAngles+=new Vector3(0,-100,0);
+            BodyTransform.position=new Vector3(mPControl.BodyPos_x[0],0,mPControl.BodyPos_z[0]);
+            BodyTransform.eulerAngles=new Vector3(Mathf.Atan2(mPControl.BodyAcc_z[0],M*G)*Mathf.Rad2Deg,0,-Mathf.Atan2(mPControl.BodyAcc_x[0],M*G)*Mathf.Rad2Deg);
+        }else if(ControlMode==2){
+            lineRenderer.SetPosition(0,new Vector3(mPControl2.BodyPos_x[0],0.1f,mPControl2.BodyPos_z[0]));
+
+            for(int i=1;i<PredictionTime;i++){
+                PredictivePositionIndicaterTransform[i].position=new Vector3(mPControl2.BodyPos_x[i],0.1f,mPControl2.BodyPos_z[i]);
+                /*for(int j=0;j<mPControl2.ObstacleMaxNum;j++){
+                    PredictiveObsPosIndicatorTransform[j,i].position=new Vector3(9,1.5f,10);
+                }
+                for(int j=0;j<mPControl2.CurObsNum;j++)
+                        PredictiveObsPosIndicatorTransform[j,i].position=new Vector3(mPControl2.ObstaclePos_x[j,i],1.5f,mPControl2.ObstaclePos_z[j,i]);*/
+                PositionIndicaterPosition[i]=new Vector3(mPControl2.BodyPos_x[i],0.1f,mPControl2.BodyPos_z[i]);
+                lineRenderer.SetPosition(i,PositionIndicaterPosition[i]);
+            }
+            Prop1.localEulerAngles+=new Vector3(0,100,0);
+            Prop2.localEulerAngles+=new Vector3(0,100,0);
+            Prop3.localEulerAngles+=new Vector3(0,-100,0);
+            Prop4.localEulerAngles+=new Vector3(0,-100,0);
+            BodyTransform.position=new Vector3(mPControl2.BodyPos_x[0],0,mPControl2.BodyPos_z[0]);
+            BodyTransform.eulerAngles=new Vector3(Mathf.Atan2(mPControl2.BodyAcc_z[0],M*G)*Mathf.Rad2Deg,0,-Mathf.Atan2(mPControl2.BodyAcc_x[0],M*G)*Mathf.Rad2Deg);
         }
-        Pre1.localEulerAngles+=new Vector3(0,100,0);
-        Pre2.localEulerAngles+=new Vector3(0,100,0);
-        Pre3.localEulerAngles+=new Vector3(0,-100,0);
-        Pre4.localEulerAngles+=new Vector3(0,-100,0);
-        BodyTransform.position=new Vector3(mPControl.BodyPos_x[0],0,mPControl.BodyPos_z[0]);
-        BodyTransform.eulerAngles=new Vector3(Mathf.Atan2(mPControl.BodyAcc_z[0],M*G)*Mathf.Rad2Deg,0,-Mathf.Atan2(mPControl.BodyAcc_x[0],M*G)*Mathf.Rad2Deg);
-    }
-}
+        
+    }//Update
+}//class
